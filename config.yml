@@ -1,0 +1,26 @@
+prefix:
+  output
+ref:
+  /willerslev/datasets/reference_genomes/hs37d5/hs37d5.fa
+units:
+  units.tsv
+panel:
+  vcf:
+    /willerslev/datasets/public/1000genomes_2015_nature/vcf/umich/{chrom}.1000g.freeze9.umich.GRCh37.snps.biallelic.pass.vcf.gz
+  alleles:
+    /willerslev/datasets/public/1000genomes_2015_nature/vcf/umich/{chrom}.1000g.freeze9.umich.GRCh37.snps.biallelic.pass.vcf.alleles.tsv.gz
+  genmap:
+    /willerslev/datasets/hapmapRecomb/2011-01_phaseII_B37/genetic_map_chr{chrom}_combined_b37.txt
+mq:
+  30
+glimpse:
+  path:
+    /science/willerslev/users-shared/science-snm-willerslev-dsw670/progs/GLIMPSE-v1.1.1/bin
+  windowsize:
+    2000000
+  buffersize:
+    200000
+  threads:
+    44
+tmp_dir:
+  /dev/shm/glimpse
