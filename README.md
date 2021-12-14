@@ -1,3 +1,3 @@
 # glimpse_impute
 
-Workflow for genotyep imputation using GLIMPSE
+Workflow for genotype imputation using GLIMPSE
