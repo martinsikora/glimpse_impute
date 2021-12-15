@@ -1,5 +1,7 @@
 prefix:
   output
+out_dir:
+  /willerslev/scratch/dsw670/tmp/glimpse/vcf
 ref:
   /willerslev/datasets/reference_genomes/hs37d5/hs37d5.fa
 units:
@@ -17,9 +19,9 @@ glimpse:
   path:
     /science/willerslev/users-shared/science-snm-willerslev-dsw670/progs/GLIMPSE-v1.1.1/bin
   windowsize:
-    2000000
+    5000000
   buffersize:
-    200000
+    500000
   threads:
     44
 tmp_dir:

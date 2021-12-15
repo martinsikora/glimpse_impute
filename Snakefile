@@ -5,6 +5,7 @@ import pandas as pd
 ## global parameters from config file
 
 PREFIX = config["prefix"]  ## output prefix
+OUT_DIR = config["out_dir"]  ## path for output files
 REF = config["ref"]  ## reference genome
 MQ = config["mq"]  ## minimum mapping quality
 TMP_DIR = config["tmp_dir"]  ## path for temporary files
@@ -27,6 +28,7 @@ SAMPLES = unit_df.index.drop_duplicates().values.tolist()
 ## --------------------------------------------------------------------------------
 ## functions
 
+
 def get_bam(wildcards):
     return unit_df.loc[(wildcards.sample), "bam"]
 
@@ -34,18 +36,8 @@ def get_bam(wildcards):
 ## --------------------------------------------------------------------------------
 ## output file sets
 
-vcf_gl_all = expand(
-    "vcf/gl_merge/{chrom}." + PREFIX + ".merge.gl.{ext}",
-    chrom=CHROMS,
-    ext=["vcf.gz", "vcf.gz.tbi"],
-)
 vcf_impute_all = expand(
-    "vcf/impute/{chrom}." + PREFIX + ".glimpse.{ext}",
-    chrom=CHROMS,
-    ext=["vcf.gz", "vcf.gz.tbi"],
-)
-vcf_phase_all = expand(
-    "vcf/impute/{chrom}." + PREFIX + ".glimpse.phased.{ext}",
+    OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.{ext}",
     chrom=CHROMS,
     ext=["vcf.gz", "vcf.gz.tbi"],
 )
@@ -57,11 +49,12 @@ vcf_phase_all = expand(
 
 rule all:
     input:
-        vcf_gl_all + vcf_impute_all + vcf_phase_all
+        vcf_impute_all,
 
 
 ## --------------------------------------------------------------------------------
 ## rules
+
 
 rule compute_gl:
     input:
@@ -94,50 +87,50 @@ rule merge_gl:
     wildcard_constraints:
         chrom="\d+",
     output:
-        vcf="vcf/gl_merge/{chrom}." + PREFIX + ".merge.gl.vcf.gz",
-        tbi="vcf/gl_merge/{chrom}." + PREFIX + ".merge.gl.vcf.gz.tbi",
+        vcf=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.vcf.gz"),
+        tbi=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.vcf.gz.tbi"),
+        lst=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.files.txt"),
     shell:
         """
-        echo {input.vcf} | perl -p -e 's/ /\\n/g' > vcf/gl_merge/{wildcards.chrom}.files.txt
-        bcftools merge -l vcf/gl_merge/{wildcards.chrom}.files.txt -m all -Oz > {output.vcf}
+        echo {input.vcf} | perl -p -e 's/ /\\n/g' > {output.lst}
+        bcftools merge -l {output.lst} -m all -Oz > {output.vcf}
         bcftools index -t {output.vcf}
         """
 
 
 rule chunk_glimpse:
     input:
-        vcf="vcf/gl_merge/{chrom}." + PREFIX + ".merge.gl.vcf.gz",
-        vcf_ref=config["panel"]["vcf"],
+        vcf=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.vcf.gz",
     wildcard_constraints:
         chrom="\d+",
     output:
-        "glimpse_chunks/{chrom}." + PREFIX + ".chunks.glimpse.txt",
+        temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".chunks.txt"),
     log:
-        "logs/{chrom}.chunks.glimpse.log",
+        OUT_DIR + "/logs/{chrom}.chunks.glimpse.log",
     shell:
         """
-        {GLIMPSE_PATH}/GLIMPSE_chunk --input {input.vcf} --reference {input.vcf_ref} --region {wildcards.chrom} --window-size {GLIMPSE_WS} --buffer-size {GLIMPSE_BS} --output {output} --log {log}
+        {GLIMPSE_PATH}/GLIMPSE_chunk --input {input.vcf} --region {wildcards.chrom} --window-size {GLIMPSE_WS} --buffer-size {GLIMPSE_BS} --output {output} --log {log}
         """
 
 
 checkpoint get_chunks_chrom:
     input:
-        "glimpse_chunks/{chrom}." + PREFIX + ".chunks.glimpse.txt",
+        TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".chunks.txt",
     output:
-        directory("glimpse_chunks/{chrom}/"),
+        temp(directory(TMP_DIR + "/{chrom}/glimpse_chunks/")),
     shell:
         """
-        mkdir glimpse_chunks/{wildcards.chrom}
-        cat {input} | awk '{{print >"glimpse_chunks/{wildcards.chrom}/"$2"_"$1".chunk"}}'
+        mkdir {TMP_DIR}/{wildcards.chrom}/glimpse_chunks
+        cat {input} | awk '{{print >"{TMP_DIR}/{wildcards.chrom}/glimpse_chunks/"$2"_"$1".chunk"}}'
         """
 
 
 rule impute_chunk_glimpse:
     input:
-        vcf="vcf/gl_merge/{chrom}." + PREFIX + ".merge.gl.vcf.gz",
+        vcf=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.vcf.gz",
         vcf_ref=config["panel"]["vcf"],
         genmap=config["panel"]["genmap"],
-        chunk="glimpse_chunks/{chrom}/{chunk}.chunk",
+        chunk=TMP_DIR + "/{chrom}/glimpse_chunks/{chunk}.chunk",
     wildcard_constraints:
         chrom="\d+",
     output:
@@ -145,12 +138,12 @@ rule impute_chunk_glimpse:
         tbi=temp(TMP_DIR + "/{chrom}/{chunk}." + PREFIX + ".chunk.vcf.gz.tbi"),
     threads: GLIMPSE_THREADS
     log:
-        "logs/{chrom}.{chunk}.impute_chunk.glimpse.log",
+        OUT_DIR + "/logs/{chrom}.{chunk}.impute_chunk.glimpse.log",
     benchmark:
-        "benchmarks/{chrom}.{chunk}.impute_chunk.glimpse.txt"
+        OUT_DIR + "/benchmarks/{chrom}.{chunk}.impute_chunk.glimpse.txt"
     shell:
         """
-        {GLIMPSE_PATH}/GLIMPSE_phase --thread {threads} --input {input.vcf} --reference {input.vcf_ref} --map {input.genmap} --input-region $(cat {input.chunk} | cut -f3) --output-region $(cat {input.chunk} | cut -f4) --output {output.vcf}
+        {GLIMPSE_PATH}/GLIMPSE_phase --thread {threads} --input {input.vcf} --reference {input.vcf_ref} --map {input.genmap} --input-region $(cat {input.chunk} | cut -f3) --output-region $(cat {input.chunk} | cut -f4) --output {output.vcf} --log {log} --seed $RANDOM
         bcftools index -t {output.vcf}
         """
 
@@ -169,13 +162,13 @@ def aggregate_chunks(wildcards):
 
 rule ligate_chunks_glimpse:
     input:
-        aggregate_chunks
+        aggregate_chunks,
     output:
-        vcf="vcf/impute/{chrom}." + PREFIX + ".glimpse.vcf.gz",
-        tbi="vcf/impute/{chrom}." + PREFIX + ".glimpse.vcf.gz.tbi",
-        lst=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".list")
+        vcf=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".ligate.vcf.gz"),
+        tbi=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".ligate.vcf.gz.tbi"),
+        lst=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".list"),
     log:
-        "logs/{chrom}.ligate.glimpse.log",
+        OUT_DIR + "/logs/{chrom}.ligate_chunks.glimpse.log",
     shell:
         """
         echo {input} | perl -p -e 's/ /\\n/g' | grep -v .tbi > {output.lst}
@@ -186,15 +179,47 @@ rule ligate_chunks_glimpse:
 
 rule phase_glimpse:
     input:
-        vcf="vcf/impute/{chrom}." + PREFIX + ".glimpse.vcf.gz",
-        tbi="vcf/impute/{chrom}." + PREFIX + ".glimpse.vcf.gz.tbi",
+        vcf=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".ligate.vcf.gz",
+        tbi=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".ligate.vcf.gz.tbi",
     output:
-        vcf="vcf/impute/{chrom}." + PREFIX + ".glimpse.phased.vcf.gz",
-        tbi="vcf/impute/{chrom}." + PREFIX + ".glimpse.phased.vcf.gz.tbi",
+        vcf=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".phased.vcf.gz"),
+        tbi=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".phased.vcf.gz.tbi"),
     log:
-        "logs/{chrom}.phase.glimpse.log",
+        OUT_DIR + "/logs/{chrom}.phase.glimpse.log",
     shell:
         """
         {GLIMPSE_PATH}/GLIMPSE_sample --input {input.vcf} --solve --output {output.vcf} --log {log}
+        bcftools index -t {output.vcf}
+        """
+
+
+rule annote_vcf_phase:
+    input:
+        vcf_ligate=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".ligate.vcf.gz",
+        tbi_ligate=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".ligate.vcf.gz.tbi",
+        vcf_phase=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".phased.vcf.gz",
+        tbi_phase=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".phased.vcf.gz.tbi",
+    output:
+        vcf_ant=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".annot.vcf.gz"),
+        tbi_ant=temp(TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".annot.vcf.gz.tbi"),
+    shell:
+        """
+        bcftools annotate -a {input.vcf_phase} -c FMT/GT {input.vcf_ligate} -Oz > {output.vcf_ant}
+        bcftools index -t {output.vcf_ant}
+        """
+
+
+rule annote_vcf_gl:
+    input:
+        vcf_ant=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".annot.vcf.gz",
+        tbi_ant=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".annot.vcf.gz.tbi",
+        vcf_gl=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.vcf.gz",
+        tbi_gl=TMP_DIR + "/{chrom}/{chrom}." + PREFIX + ".gl_merge.vcf.gz.tbi",
+    output:
+        vcf=OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.vcf.gz",
+        tbi=OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.vcf.gz.tbi",
+    shell:
+        """
+        bcftools annotate -a {input.vcf_gl} -c FMT/DP,FMT/PL -Oz {input.vcf_ant} > {output.vcf}
         bcftools index -t {output.vcf}
         """
