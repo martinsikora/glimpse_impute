@@ -1,0 +1,2 @@
+##INFO=<ID=pan_troglodytes,Number=1,Type=String,Description="allele observed in pan_troglodytes">
+##INFO=<ID=CAP_TARGET_1240K,Number=0,Type=Flag,Description="SNP is in 1240K capture target set">

@@ -1,0 +1,14 @@
+prefix:
+  output
+out_dir:
+  /science/willerslev/scratch/dsw670/glimpse/extract
+units:
+  units.tsv
+tmp_dir:
+  /tmp
+og:
+  /willerslev/datasets/alignments/epo_primates/pan_troglodytes/{chrom}.pan_troglodytes.epo.fa.gz
+targets:
+  /willerslev/datasets/panels/capturePanels/1240k.autosomes.snps.fwd.clean.bed.gz
+hdr:
+  hdr.txt
