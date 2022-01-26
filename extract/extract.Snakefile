@@ -41,7 +41,7 @@ vcf_all = expand(
 )
 plink_all = expand(
     OUT_DIR + "/plink/" + PREFIX + ".glimpse.{ext}",
-    ext=["bed", "bim", "fam", "target.snplist"],
+    ext=["bed", "bim", "fam", "target.snplist", "eigenvec", "eigenval", "pca.plot.pdf"],
 )
 
 
@@ -199,4 +199,34 @@ rule get_plink:
         cat {params.px}.bim | awk '{{print $1"\\t"$1":"$4"\\t"$3"\\t"$4"\\t"$5"\\t"$6}}' > {params.px}.bim_tmp
         mv {params.px}.bim_tmp {output.bim}
         """
-        
+
+          
+rule get_pca:
+    input:
+        bed=OUT_DIR + "/plink/" + PREFIX + ".glimpse.bed",
+        bim=OUT_DIR + "/plink/" + PREFIX + ".glimpse.bim",
+        fam=OUT_DIR + "/plink/" + PREFIX + ".glimpse.fam",
+        lst=OUT_DIR + "/plink/" + PREFIX + ".glimpse.target.snplist"
+    output:
+        OUT_DIR + "/plink/" + PREFIX + ".glimpse.eigenvec",
+        OUT_DIR + "/plink/" + PREFIX + ".glimpse.eigenval",
+    params:
+        px=OUT_DIR + "/plink/" + PREFIX + ".glimpse"
+    threads:
+        24
+    shell:
+        """
+        plink --bfile {params.px} --pca header tabs --extract {input.lst} --threads {threads} --out {params.px}
+        """
+
+
+rule plot_pca:
+    input:
+        OUT_DIR + "/plink/" + PREFIX + ".glimpse.eigenvec",
+    output:
+        OUT_DIR + "/plink/" + PREFIX + ".glimpse.pca.plot.pdf",
+    shell:
+        """
+        Rscript plotPca.R {input} {output}
+        """
+
