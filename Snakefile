@@ -9,6 +9,7 @@ OUT_DIR = config["out_dir"]  ## path for output files
 REF = config["ref"]  ## reference genome
 MQ = config["mq"]  ## minimum mapping quality
 TMP_DIR = config["tmp_dir"]  ## path for temporary files
+TARGETS = config["targets"]  ## path to BED file with targeted SNP locations
 
 GLIMPSE_PATH = config["glimpse"]["path"]
 GLIMPSE_WS = config["glimpse"]["windowsize"]
@@ -42,6 +43,8 @@ vcf_impute_all = expand(
     ext=["vcf.gz", "vcf.gz.tbi"],
 )
 
+summary_all = [OUT_DIR + "/" + PREFIX + ".glimpse.summary.tsv"]
+
 
 ## --------------------------------------------------------------------------------
 ## targets
@@ -50,6 +53,7 @@ vcf_impute_all = expand(
 rule all:
     input:
         vcf_impute_all,
+        summary_all,
 
 
 ## --------------------------------------------------------------------------------
@@ -222,4 +226,27 @@ rule annote_vcf_gl:
         """
         bcftools annotate -a {input.vcf_gl} -c FMT/DP,FMT/PL -Oz {input.vcf_ant} > {output.vcf}
         bcftools index -t {output.vcf}
+        """
+
+
+rule summarize_chrom:
+    input:
+        vcf=OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.vcf.gz",
+        tbi=OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.vcf.gz.tbi",
+    output:
+        OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.summary.tsv",
+    shell:
+        """
+        Rscript src/summary.R {input.vcf} {TARGETS} {output}
+        """
+
+
+rule summarize_all:
+    input:
+        expand(OUT_DIR + "/{chrom}." + PREFIX + ".glimpse.summary.tsv", chrom=CHROMS),
+    output:
+        OUT_DIR + "/" + PREFIX + ".glimpse.summary.tsv",
+    shell:
+        """
+        Rscript src/summaryAll.R {input} {output}
         """

@@ -13,6 +13,8 @@ panel:
     /willerslev/datasets/public/1000genomes_2015_nature/vcf/umich/{chrom}.1000g.freeze9.umich.GRCh37.snps.biallelic.pass.vcf.alleles.tsv.gz
   genmap:
     /willerslev/datasets/hapmapRecomb/2011-01_phaseII_B37/genetic_map_chr{chrom}_combined_b37.txt
+targets:
+  /willerslev/datasets/panels/capturePanels/1240k.autosomes.snps.fwd.clean.bed.gz
 mq:
   30
 glimpse:
