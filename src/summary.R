@@ -52,7 +52,7 @@ chrom <- snps[1] %>%
 
 ## chunk samples into sets of 50 to avoid issues with too large matrices
 chunkSize <- 50
-nChunks <- nSamples %/% chunkSize + 1
+nChunks <- (nSamples - 1) %/% chunkSize + 1
 
 samplesChunk <- split(samples, rep(1:nChunks, each = chunkSize, length.out = nSamples))
 
