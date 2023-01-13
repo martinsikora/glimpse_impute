@@ -22,10 +22,6 @@ PX = unit_df.index.drop_duplicates().values.tolist()
 ## functions
 
 
-def get_samples(wildcards):
-    d = ",".join(unit_df.loc[[(wildcards.px)]].sampleId.tolist())
-    return d
-
 def get_vcf(wildcards):
     f = unit_df.loc[[(wildcards.px)]].path.values[0] + "/" + wildcards.chrom + "." + wildcards.px + ".glimpse.vcf.gz"
     return f
@@ -57,21 +53,30 @@ rule all:
 ## --------------------------------------------------------------------------------
 ## rules
 
-
 rule extract_samples:
     input:
+        config["units"]
+    output:
+        sample=temp(expand(TMP_DIR + "/{px}.samples.txt", px=PX))
+    shell:
+        """
+        cat {input} | tail -n+2 | awk '{{print $2>"{TMP_DIR}/"$1".samples.txt"}}'
+        """
+
+
+rule get_vcf_samples:
+    input:
         vcf=get_vcf,
+        sample=TMP_DIR + "/{px}.samples.txt"
     wildcard_constraints:
         chrom="\d+",
     output:
         vcf=temp(TMP_DIR + "/{chrom}/{chrom}.{px}." + PREFIX + ".extract.vcf.gz"),
-        sample=temp(TMP_DIR + "/{chrom}/{px}.samples.txt"),
-    params:
-        samples=get_samples
+        sample=temp(TMP_DIR + "/{chrom}/{px}." + PREFIX + ".samples_new.txt"),
     shell:
         """
-        echo {params.samples} | tr ',' '\\n' | awk '{{print $1".{wildcards.px}"}}' > {output.sample}
-        bcftools view -s {params.samples} -Oz {input.vcf} | bcftools reheader -s {output.sample} > {output.vcf}
+        cat {input.sample} | awk '{{print $1".{wildcards.px}"}}' > {output.sample}
+        bcftools view -S {input.sample} -Oz {input.vcf} | bcftools reheader -s {output.sample} > {output.vcf}
         """
 
 

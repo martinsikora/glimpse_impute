@@ -1,7 +1,7 @@
 prefix:
   output
 out_dir:
-  /science/willerslev/scratch/dsw670/glimpse/extract
+  /home/dsw670/tmp/extract
 units:
   units.tsv
 tmp_dir:
